@@ -1,0 +1,9 @@
+build
+cmake-build-*
+.git
+.idea
+.vscode
+web/dashboard/node_modules
+web/dashboard/dist
+**/.DS_Store
+agent-transcripts

@@ -1,0 +1,17 @@
+FROM gcc:14
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        cmake \
+        git \
+        libboost-dev \
+        ninja-build \
+        pkg-config \
+        python3 \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch v3.11.3 https://github.com/nlohmann/json.git /opt/third_party/json \
+    && git clone --depth 1 --branch v3.7.1 https://github.com/catchorg/Catch2.git /opt/third_party/Catch2
+
+WORKDIR /src
+CMD ["bash", "/src/docker/run-unit-tests.sh"]

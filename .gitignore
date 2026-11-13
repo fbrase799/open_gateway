@@ -1,0 +1,12 @@
+build/
+cmake-build-*/
+.cache/
+sample_client/node_modules/
+web/dashboard/dist/
+*.so
+*.dylib
+*.o
+.DS_Store
+*.user
+.idea/
+.vscode/

@@ -1,0 +1,15 @@
+# The 7-inch panel is built by the separate Yocto product, which includes this
+# source and uses that image's Qt. This file runs only the headless edge gateway.
+name: open-gateway-pi
+
+services:
+  gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
+      args:
+        OGW_WITH_CAN: "1"
+    environment:
+      OGW_PROFILE: edge
+    network_mode: host
+    restart: unless-stopped

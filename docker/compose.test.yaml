@@ -1,0 +1,24 @@
+services:
+  display:
+    profiles: ["manual"]
+
+  gateway:
+    environment:
+      OGW_PROFILE: test
+
+  live-tests:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
+    entrypoint: ["/usr/local/bin/ogw_live_tests"]
+    environment:
+      OGW_HTTP: http://gateway:8080
+      OGW_ADMIN: http://gateway:8081
+      OGW_PLUGIN_VOLUME: /plugins
+      OGW_MOTOR_SO: /opt/ogw/examples/libmotor_sim.so
+      OGW_BAD_SO: /opt/ogw/examples/libbad_plugin.so
+    volumes:
+      - plugindir:/plugins
+    depends_on:
+      gateway:
+        condition: service_healthy

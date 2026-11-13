@@ -1,0 +1,45 @@
+FROM gcc:14 AS build
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        cmake \
+        git \
+        libboost-dev \
+        ninja-build \
+        pkg-config \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN git clone --depth 1 --branch v3.11.3 https://github.com/nlohmann/json.git /opt/third_party/json \
+    && git clone --depth 1 --branch v3.7.1 https://github.com/catchorg/Catch2.git /opt/third_party/Catch2
+
+ARG OGW_WITH_CAN=0
+WORKDIR /src
+COPY . /src
+RUN cmake -S /src -B /tmp/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
+    && cmake --build /tmp/build \
+    && cmake --install /tmp/build --prefix /tmp/install \
+    && cmake -S /src/plugins/motor_sim -B /tmp/motor -G Ninja -DOGW_SDK_DIR=/tmp/install \
+    && cmake --build /tmp/motor \
+    && cp /tmp/motor/libmotor_sim.so /tmp/install/examples/libmotor_sim.so \
+    && if [ "$OGW_WITH_CAN" = "1" ]; then \
+         cmake -S /src/plugins/can_motor -B /tmp/can -G Ninja -DOGW_SDK_DIR=/tmp/install \
+         && cmake --build /tmp/can \
+         && cp /tmp/can/libcan_motor.so /tmp/install/examples/libcan_motor.so; \
+       fi
+
+FROM gcc:14
+
+RUN apt-get update && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=build /tmp/install/bin/ogw /usr/local/bin/ogw
+COPY --from=build /tmp/install/bin/ogw-driver /usr/local/bin/ogw-driver
+COPY --from=build /tmp/install/bin/ogw_live_tests /usr/local/bin/ogw_live_tests
+COPY --from=build /tmp/install/examples/ /opt/ogw/examples/
+COPY config/gateway.local.json config/gateway.cloud.json config/gateway.test.json config/gateway.edge.json /etc/ogw/
+COPY docker/entrypoint.sh /usr/local/bin/ogw-entrypoint
+RUN chmod +x /usr/local/bin/ogw-entrypoint \
+    && mkdir -p /var/lib/ogw/plugins
+
+EXPOSE 8080 8081
+ENTRYPOINT ["/usr/local/bin/ogw-entrypoint"]

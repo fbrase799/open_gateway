@@ -1,0 +1,55 @@
+name: open-gateway
+
+services:
+  unit-tests:
+    profiles: ["test"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.toolchain
+    volumes:
+      - ..:/src:ro
+    command: ["bash", "/src/docker/run-unit-tests.sh"]
+
+  gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.gateway
+      args:
+        OGW_WITH_CAN: "1"
+    environment:
+      OGW_PROFILE: local
+    ports:
+      - "127.0.0.1:8081:8081"
+    volumes:
+      - plugindir:/var/lib/ogw/plugins
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/v1/health"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+      start_period: 5s
+
+  web:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.web
+    ports:
+      - "8080:80"
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+  display:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.display
+    ports:
+      - "6080:6080"
+    environment:
+      OGW_API: http://gateway:8080
+    depends_on:
+      gateway:
+        condition: service_healthy
+
+volumes:
+  plugindir:

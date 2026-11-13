@@ -1,0 +1,24 @@
+{
+  "httpPort": 8080,
+  "adminPort": 8081,
+  "adminApi": true,
+  "pluginDir": "/var/lib/ogw/plugins",
+  "historySamples": 600,
+  "logLevel": "info",
+  "plugins": [
+    {
+      "id": "temperature-sim",
+      "file": "libtemperature_sim.so",
+      "activate": true,
+      "config": {
+        "intervalMs": 200,
+        "seed": 1,
+        "timeline": [
+          {"forMs": 20000, "mode": "normal"},
+          {"forMs": 5000, "mode": "out_of_range"},
+          {"forMs": 5000, "mode": "disconnected"}
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+name: Azure deploy
+
+on:
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Deploy simulated demo
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+        run: |
+          if [ -z "${AZURE_CREDENTIALS}" ]; then
+            echo "AZURE_CREDENTIALS is not set. Build the images, push them, then run the command in docs/azure.md."
+            exit 0
+          fi
+          if [ -z "${GATEWAY_IMAGE:-}" ] || [ -z "${WEB_IMAGE:-}" ]; then
+            echo "Set GATEWAY_IMAGE and WEB_IMAGE to the pushed image names. See docs/azure.md."
+            exit 1
+          fi
+          az deployment group create \
+            --resource-group "${AZURE_RESOURCE_GROUP:-open-gateway}" \
+            --template-file infra/azure/main.bicep \
+            --parameters gatewayImage="${GATEWAY_IMAGE}" webImage="${WEB_IMAGE}"

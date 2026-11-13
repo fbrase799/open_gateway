@@ -1,0 +1,31 @@
+{
+  "httpPort": 8080,
+  "adminPort": 8081,
+  "adminApi": true,
+  "pluginDir": "/var/lib/ogw/plugins",
+  "historySamples": 600,
+  "logLevel": "info",
+  "plugins": [
+    {
+      "id": "can-motor",
+      "file": "libcan_motor.so",
+      "activate": true,
+      "simulated": false,
+      "config": { "interface": "can0" }
+    },
+    {
+      "id": "temperature-sim",
+      "file": "libtemperature_sim.so",
+      "activate": true,
+      "config": {
+        "intervalMs": 1000,
+        "seed": 1,
+        "timeline": [
+          {"forMs": 20000, "mode": "normal"},
+          {"forMs": 10000, "mode": "out_of_range"},
+          {"forMs": 10000, "mode": "disconnected"}
+        ]
+      }
+    }
+  ]
+}
