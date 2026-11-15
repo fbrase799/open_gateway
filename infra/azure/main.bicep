@@ -1,6 +1,6 @@
 param location string = resourceGroup().location
 param gatewayImage string
-param webImage string
+param displayImage string
 param namePrefix string = 'ogw'
 
 resource logs 'Microsoft.OperationalInsights/workspaces@2023-09-01' = {
@@ -59,26 +59,31 @@ resource gateway 'Microsoft.App/containerApps@2024-03-01' = {
   }
 }
 
-resource web 'Microsoft.App/containerApps@2024-03-01' = {
-  name: '${namePrefix}-web'
+resource display 'Microsoft.App/containerApps@2024-03-01' = {
+  name: '${namePrefix}-display'
   location: location
   properties: {
     managedEnvironmentId: environment.id
     configuration: {
       ingress: {
         external: true
-        targetPort: 80
+        targetPort: 6080
         transport: 'auto'
       }
     }
     template: {
       containers: [
         {
-          name: 'web'
-          image: webImage
+          name: 'display'
+          image: displayImage
+          env: [
+            { name: 'OGW_UI', value: 'novnc' }
+            { name: 'OGW_API', value: 'http://${namePrefix}-gateway' }
+            { name: 'OGW_MQTT_URL', value: '' }
+          ]
           resources: {
-            cpu: json('0.25')
-            memory: '0.5Gi'
+            cpu: json('0.5')
+            memory: '1Gi'
           }
         }
       ]
@@ -86,4 +91,4 @@ resource web 'Microsoft.App/containerApps@2024-03-01' = {
   }
 }
 
-output webFqdn string = web.properties.configuration.ingress.fqdn
+output displayFqdn string = display.properties.configuration.ingress.fqdn

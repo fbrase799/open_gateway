@@ -2,6 +2,7 @@
 
 #include "catalog.hpp"
 
+#include <QByteArray>
 #include <QObject>
 #include <QTimer>
 #include <QVariant>
@@ -10,29 +11,31 @@ class QNetworkAccessManager;
 
 class GatewayClient : public QObject {
     Q_OBJECT
-    Q_PROPERTY(QVariantList devices READ devices NOTIFY changed)
-    Q_PROPERTY(QVariantList sources READ sources NOTIFY changed)
+    Q_PROPERTY(QVariantList sensors READ sensors NOTIFY changed)
+    Q_PROPERTY(QVariantList dashboard READ dashboard NOTIFY changed)
     Q_PROPERTY(QString link READ link NOTIFY changed)
 
 public:
     explicit GatewayClient(QString baseUrl, QObject* parent = nullptr);
-    QVariantList devices() const { return devices_; }
-    QVariantList sources() const { return sources_; }
+    QVariantList sensors() const { return sensors_; }
+    QVariantList dashboard() const { return dashboard_; }
     QString link() const { return link_; }
     Q_INVOKABLE void setSourceActive(const QString& id, bool active);
+    Q_INVOKABLE void sendCommand(const QString& deviceId, const QString& capabilityId, double value);
 
 signals:
     void changed();
 
 private:
     void refresh();
-    QVariantList to_variants(const QVector<DeviceRow>& rows) const;
-    QVariantList to_variants(const QVector<SourceRow>& rows) const;
+    void rebuild();
 
     QString baseUrl_;
     QNetworkAccessManager* network_ = nullptr;
     QTimer timer_;
-    QVariantList devices_;
-    QVariantList sources_;
-    QString link_ = "connecting";
+    QByteArray devicesBody_;
+    QByteArray supportBody_;
+    QVariantList sensors_;
+    QVariantList dashboard_;
+    QString link_ = QStringLiteral("connecting");
 };

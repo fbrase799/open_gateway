@@ -3,18 +3,26 @@
 #include <QString>
 #include <QVector>
 
-struct DeviceRow {
+struct SensorRow {
+    QString id;
+    QString name;
+    QString availability;
+    bool canToggle = false;
+    QString detail;
+};
+
+struct DashboardCard {
     QString id;
     QString name;
     QString status;
+    QString values;
+    QString commandId;
+    QString commandName;
 };
 
-struct SourceRow {
-    QString id;
-    QString name;
-    QString state;
-    QString error;
+struct CatalogView {
+    QVector<SensorRow> sensors;
+    QVector<DashboardCard> dashboard;
 };
 
-QVector<DeviceRow> devices_from_json(const QByteArray& body);
-QVector<SourceRow> sources_from_json(const QByteArray& body);
+CatalogView catalog_from_json(const QByteArray& devices_body, const QByteArray& support_body);

@@ -26,6 +26,7 @@ struct Config {
     std::size_t telemetryQueue = 4096;
     LogLevel logLevel = LogLevel::Info;
     std::string corsOrigin;
+    std::string mqttUrl;
     std::vector<PluginConfig> plugins;
 };
 

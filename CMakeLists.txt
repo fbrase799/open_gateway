@@ -73,7 +73,7 @@ target_include_directories(ogw_codec PUBLIC "${CMAKE_SOURCE_DIR}/include")
 target_link_libraries(ogw_codec PUBLIC ogw_core nlohmann_json::nlohmann_json)
 ogw_warnings(ogw_codec)
 
-add_library(ogw_api STATIC src/api/http_server.cpp)
+add_library(ogw_api STATIC src/api/http_server.cpp src/api/mqtt_client.cpp)
 target_include_directories(ogw_api PUBLIC "${CMAKE_SOURCE_DIR}/include")
 target_link_libraries(ogw_api PUBLIC ogw_host ogw_codec Boost::headers Threads::Threads)
 ogw_warnings(ogw_api)

@@ -29,7 +29,7 @@ RUN cmake -S /src -B /tmp/build -G Ninja -DCMAKE_BUILD_TYPE=Release \
 
 FROM gcc:14
 
-RUN apt-get update && apt-get install -y --no-install-recommends curl \
+RUN apt-get update && apt-get install -y --no-install-recommends curl iproute2 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=build /tmp/install/bin/ogw /usr/local/bin/ogw
@@ -37,6 +37,7 @@ COPY --from=build /tmp/install/bin/ogw-driver /usr/local/bin/ogw-driver
 COPY --from=build /tmp/install/bin/ogw_live_tests /usr/local/bin/ogw_live_tests
 COPY --from=build /tmp/install/examples/ /opt/ogw/examples/
 COPY config/gateway.local.json config/gateway.cloud.json config/gateway.test.json config/gateway.edge.json /etc/ogw/
+COPY api/openapi.yaml /opt/ogw/openapi.yaml
 COPY docker/entrypoint.sh /usr/local/bin/ogw-entrypoint
 RUN chmod +x /usr/local/bin/ogw-entrypoint \
     && mkdir -p /var/lib/ogw/plugins

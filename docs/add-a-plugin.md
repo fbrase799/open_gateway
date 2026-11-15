@@ -65,9 +65,11 @@ Copy the resulting `.so` into the gateway plugin directory and ask the operator 
 curl -fsS -X POST http://127.0.0.1:8081/api/v1/admin/plugins/scan
 ```
 
-Scan advertises the source. The sample client or the Qt screen then activates it with `PUT /api/v1/support/sources/clock` and `{"state":"active"}`. The public API does not accept a library path or a file upload.
+Scan advertises the source. The Qt sensor list then activates it with `PUT /api/v1/support/sources/clock` and `{"state":"active"}`. The public API does not accept a library path or a file upload.
 
-Do not edit `src/`, `sample_client`, or `edge/display` to add the plugin. The admin API is for operators on a trusted network. The cloud and Pi profiles leave it off.
+`kind` is `measurement` or `command`. Override `command()` when a capability is a command. The host calls it from `POST /api/v1/devices/{deviceId}/commands/{capabilityId}` and from the MQTT command topic.
+
+Do not edit `src/` or `edge/display` to add the plugin. The admin API is for operators on a trusted network. The cloud and Pi profiles leave it off.
 
 ## Checklist
 
@@ -77,4 +79,4 @@ Do not edit `src/`, `sample_client`, or `edge/display` to add the plugin. The ad
 - Capabilities declare `kind`, `valueType`, and `staleAfterMs`. Readings include a timestamp and a quality.
 - Client-visible settings are declared in `settings_schema`, with a type and a range.
 - `stop` returns only after your threads have finished.
-- Both clients show the new device from the API, with no client change.
+- The sensor list shows the new source from the support catalog, with no client change.

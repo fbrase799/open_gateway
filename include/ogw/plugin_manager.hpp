@@ -73,6 +73,7 @@ public:
     CommandStatus deactivate(const std::string& id);
     CommandStatus set_export(const std::string& id, bool enabled);
     CommandStatus configure_source(const std::string& id, const std::string& state, const std::string& settings_json);
+    CommandStatus invoke(const std::string& device_id, const std::string& capability_id, const std::string& json);
     bool export_enabled(const std::string& id);
     std::string support_json();
     std::vector<PluginInfo> list();

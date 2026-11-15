@@ -10,7 +10,7 @@ namespace {
 
 constexpr const char* kDevice = R"({
   "localId": "motor-01",
-  "displayName": "Simulated Motor",
+  "displayName": "Motor Control",
   "status": "connected",
   "capabilities": [
     {
@@ -45,13 +45,45 @@ constexpr const char* kDevice = R"({
       "presentation": "value",
       "range": {"min": 0, "max": 150},
       "staleAfterMs": 5000
+    },
+    {
+      "id": "set_duty",
+      "kind": "command",
+      "valueType": "number",
+      "displayName": "Duty",
+      "presentation": "gauge",
+      "range": {"min": 0, "max": 100},
+      "staleAfterMs": 5000
     }
   ]
 })";
 
 class MotorPlugin final : public ogw::sdk::Plugin {
 public:
-    ogw::sdk::Info info() const override { return {"motor-sim", "Motor Simulator", "0.1.0"}; }
+    ogw::sdk::Info info() const override { return {"motor-sim", "Motor Control", "0.1.0"}; }
+
+    void command(std::string_view capability, std::string_view payload) override {
+        if (capability != "set_duty") {
+            throw std::runtime_error("command is not available");
+        }
+        int duty = 0;
+        const auto marker = payload.find("\"value\"");
+        if (marker != std::string_view::npos) {
+            auto pos = marker + 7;
+            while (pos < payload.size() && (payload[pos] == ' ' || payload[pos] == ':' || payload[pos] == '"')) {
+                ++pos;
+            }
+            while (pos < payload.size() && payload[pos] >= '0' && payload[pos] <= '9') {
+                duty = duty * 10 + (payload[pos] - '0');
+                if (duty > 100) {
+                    duty = 100;
+                    break;
+                }
+                ++pos;
+            }
+        }
+        commanded_.store(duty);
+    }
 
     std::string settings_schema() const override {
         return R"([{"name":"intervalMs","valueType":"number","min":200,"max":60000}])";
@@ -105,7 +137,9 @@ private:
             if (mode != "disconnected") {
                 const auto now = host().wall_time_ms();
                 const bool fault = mode == "fault";
-                const double speed = fault ? 0.0 : ogw::sdk::wave(scenario_.seed, tick, 1500.0, 40.0);
+                const int duty = commanded_.load();
+                const double speed = fault ? 0.0 : (duty > 0 ? static_cast<double>(duty) * 30.0
+                                                             : ogw::sdk::wave(scenario_.seed, tick, 1500.0, 40.0));
                 auto speed_reading = ogw::sdk::number_reading(speed, fault ? OGW_QUALITY_BAD : OGW_QUALITY_GOOD, now,
                                                               fault ? "fault" : nullptr);
                 host().publish("motor-01", "speed", speed_reading);
@@ -124,6 +158,7 @@ private:
     }
 
     ogw::sdk::Scenario scenario_;
+    std::atomic<int> commanded_{0};
     std::atomic<bool> running_{false};
     std::chrono::steady_clock::time_point started_{};
     std::thread thread_;

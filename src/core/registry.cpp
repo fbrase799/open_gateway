@@ -53,7 +53,7 @@ std::string DeviceRegistry::validate_capability(const Capability& capability) {
     if (!valid_id(capability.id)) {
         return "capability id is invalid";
     }
-    if (capability.kind.empty() || capability.kind.size() > 32) {
+    if (capability.kind != "measurement" && capability.kind != "command") {
         return "capability kind is invalid";
     }
     if (capability.displayName.empty() || capability.displayName.size() > 80) {
@@ -208,6 +208,10 @@ DeviceRegistry::PublishResult DeviceRegistry::publish(const std::string& device_
     const Capability* capability = find_capability(record->capabilities, capability_id);
     if (capability == nullptr) {
         result.reason = "unknown_capability";
+        return result;
+    }
+    if (capability->kind != "measurement") {
+        result.reason = "command_not_measurement";
         return result;
     }
     if (!value_matches(capability->valueType, reading.value)) {

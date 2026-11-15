@@ -199,6 +199,41 @@ http::response<http::string_body> handle_support_put(const http::request<http::s
     return error_response(http::status::not_found, "not_found", "unknown route", context);
 }
 
+http::response<http::string_body> handle_command(const http::request<http::string_body>& request, const std::string& path,
+                                                 ApiContext& context) {
+    if (!rest_open(context)) {
+        return error_response(http::status::conflict, "export_disabled", "REST export is disabled", context);
+    }
+    constexpr std::string_view prefix = "/api/v1/devices/";
+    constexpr std::string_view marker = "/commands/";
+    const auto rest = path.substr(prefix.size());
+    const auto marker_pos = rest.rfind(marker);
+    if (marker_pos == std::string::npos || marker_pos == 0) {
+        return error_response(http::status::not_found, "not_found", "unknown route", context);
+    }
+    const auto device_id = rest.substr(0, marker_pos);
+    const auto capability_id = rest.substr(marker_pos + marker.size());
+    if (capability_id.empty() || capability_id.find('/') != std::string::npos) {
+        return error_response(http::status::not_found, "not_found", "unknown route", context);
+    }
+    const auto body = nlohmann::json::parse(request.body(), nullptr, false);
+    if (body.is_discarded() || !body.is_object() || !body.contains("value") || !body["value"].is_number()) {
+        return error_response(http::status::bad_request, "invalid_setting", "value must be a number", context);
+    }
+    auto status = context.plugins->invoke(device_id, capability_id, body.dump());
+    if (status.error == "unknown_device" || status.error == "unknown_capability") {
+        return error_response(http::status::not_found, "not_found", status.error, context);
+    }
+    if (status.error == "not_a_command") {
+        return error_response(http::status::bad_request, "not_a_command", "capability is not a command", context);
+    }
+    if (!status.ok) {
+        return error_response(http::status::conflict, status.error.empty() ? "rejected" : status.error.c_str(),
+                              status.error.empty() ? "command was rejected" : status.error, context);
+    }
+    return respond(http::status::ok, R"({"ok":true})", context);
+}
+
 http::response<http::string_body> handle_public(const http::request<http::string_body>& request, const std::string& path,
                                                 const std::string& query, ApiContext& context) {
     if (request.method() == http::verb::options) {
@@ -212,6 +247,10 @@ http::response<http::string_body> handle_public(const http::request<http::string
     }
     if (path.rfind("/api/v1/support/", 0) == 0) {
         return handle_support_put(request, path, context);
+    }
+    constexpr std::string_view devices = "/api/v1/devices/";
+    if (request.method() == http::verb::post && path.rfind(devices, 0) == 0 && path.find("/commands/") != std::string::npos) {
+        return handle_command(request, path, context);
     }
     if (request.method() != http::verb::get) {
         return error_response(http::status::method_not_allowed, "method_not_allowed", "GET is required", context);

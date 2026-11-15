@@ -167,18 +167,36 @@ TEST_CASE("bounded queue drops the oldest item") {
     REQUIRE_FALSE(queue.try_pop().has_value());
 }
 
-TEST_CASE("a real sensor is probed before a simulated one") {
+TEST_CASE("a real sensor is probed and a simulator stays off") {
     const ogw::SourceRequest real{false, true};
     const ogw::SourceRequest fallback{true, true};
     const ogw::SourceRequest optional_sim{true, false};
     REQUIRE(ogw::probe_source(real));
     REQUIRE_FALSE(ogw::probe_source(fallback));
     REQUIRE_FALSE(ogw::use_simulated_source(fallback, true));
-    REQUIRE(ogw::use_simulated_source(fallback, false));
+    REQUIRE_FALSE(ogw::use_simulated_source(fallback, false));
     REQUIRE_FALSE(ogw::use_simulated_source(optional_sim, false));
     REQUIRE(ogw::resolve_simulated("temperature-sim", std::nullopt));
     REQUIRE_FALSE(ogw::resolve_simulated("can-motor", std::nullopt));
     REQUIRE_FALSE(ogw::resolve_simulated("temperature-sim", false));
+}
+
+TEST_CASE("a command capability is not a measurement") {
+    ogw::ManualClock clock(0);
+    ogw::DeviceRegistry registry;
+    ogw::TelemetryPipeline pipeline(registry, clock, 4);
+    auto command = number_capability("set_duty");
+    command.kind = "command";
+    REQUIRE(registry.upsert("motor", room("showcase", {command}), true).ok);
+    ogw::Reading reading;
+    reading.value = 40.0;
+    reading.sourceTimestampMs = 1;
+    auto published = pipeline.publish("motor/showcase", "set_duty", reading);
+    REQUIRE_FALSE(published.accepted);
+    REQUIRE(published.reason == "command_not_measurement");
+    auto actuator = number_capability("move");
+    actuator.kind = "actuator";
+    REQUIRE_FALSE(registry.upsert("motor", room("other", {actuator}), true).ok);
 }
 
 TEST_CASE("two sources share one pipeline") {

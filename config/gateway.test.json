@@ -9,7 +9,7 @@
     {
       "id": "temperature-sim",
       "file": "libtemperature_sim.so",
-      "activate": true,
+      "activate": false,
       "config": {
         "intervalMs": 200,
         "seed": 1,

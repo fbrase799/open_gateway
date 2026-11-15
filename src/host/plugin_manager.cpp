@@ -199,6 +199,10 @@ struct PluginManager::Impl {
                                     {{"id", "websocket"},
                                      {"enabled", websocket_enabled_},
                                      {"mutable", true},
+                                     {"settings", nlohmann::json::array()}},
+                                    {{"id", "mqtt"},
+                                     {"enabled", mqtt_enabled_},
+                                     {"mutable", true},
                                      {"settings", nlohmann::json::array()}}})},
             {"sources", std::move(sources)}};
         return document.dump();
@@ -661,30 +665,6 @@ struct PluginManager::Impl {
         if (reconciling_) {
             return;
         }
-        reconciling_ = true;
-        struct Guard {
-            bool& flag;
-            ~Guard() { flag = false; }
-        } guard{reconciling_};
-        if (real_device_connected()) {
-            for (auto& plugin : plugins_) {
-                if (!resolve_simulated(plugin->id, plugin->simulatedOverride) || plugin->state != PluginState::Active) {
-                    continue;
-                }
-                plugin->suspendedForReal = true;
-                deactivate_impl(*plugin);
-            }
-            return;
-        }
-        for (auto& plugin : plugins_) {
-            if (!plugin->suspendedForReal) {
-                continue;
-            }
-            plugin->suspendedForReal = false;
-            if (plugin->state == PluginState::Inactive || plugin->state == PluginState::Loaded) {
-                activate_impl(*plugin);
-            }
-        }
     }
 
     CommandStatus activate_impl(LoadedPlugin& plugin) {
@@ -900,6 +880,7 @@ struct PluginManager::Impl {
     Listener listener_;
     bool rest_enabled_ = true;
     bool websocket_enabled_ = true;
+    bool mqtt_enabled_ = true;
 
     bool recreate(LoadedPlugin& plugin, std::string& error) {
         if (plugin.state == PluginState::Active) {
@@ -1033,6 +1014,8 @@ CommandStatus PluginManager::set_export(const std::string& id, bool enabled) {
             impl_->rest_enabled_ = enabled;
         } else if (id == "websocket") {
             impl_->websocket_enabled_ = enabled;
+        } else if (id == "mqtt") {
+            impl_->mqtt_enabled_ = enabled;
         } else {
             status.error = "not_advertised";
             return status;
@@ -1096,6 +1079,53 @@ CommandStatus PluginManager::configure_source(const std::string& id, const std::
     });
 }
 
+CommandStatus PluginManager::invoke(const std::string& device_id, const std::string& capability_id, const std::string& json) {
+    return impl_->on_consumer([&] {
+        CommandStatus status;
+        status.id = capability_id;
+        const auto device = impl_->registry_.find(device_id);
+        if (!device) {
+            status.error = "unknown_device";
+            return status;
+        }
+        const Capability* capability = nullptr;
+        for (const auto& item : device->capabilities) {
+            if (item.id == capability_id) {
+                capability = &item;
+                break;
+            }
+        }
+        if (capability == nullptr) {
+            status.error = "unknown_capability";
+            return status;
+        }
+        if (capability->kind != "command") {
+            status.error = "not_a_command";
+            return status;
+        }
+        auto* plugin = impl_->find(device->pluginId);
+        if (plugin == nullptr || plugin->state != PluginState::Active || plugin->plugin == nullptr ||
+            plugin->plugin->vtable == nullptr) {
+            status.error = "not_active";
+            return status;
+        }
+        const auto* vtable = plugin->plugin->vtable;
+        const std::size_t invoke_end = offsetof(ogw_plugin_vtable, invoke) + sizeof(vtable->invoke);
+        if (vtable->size < invoke_end || vtable->invoke == nullptr) {
+            status.error = "command_unsupported";
+            return status;
+        }
+        char err[256] = {};
+        const int rc = vtable->invoke(plugin->plugin, capability_id.c_str(), json.c_str(), err, sizeof(err));
+        if (rc != OGW_OK) {
+            status.error = err[0] == '\0' ? "rejected" : err;
+            return status;
+        }
+        status.ok = true;
+        return status;
+    });
+}
+
 bool PluginManager::export_enabled(const std::string& id) {
     return impl_->on_consumer([&] {
         if (id == "rest") {
@@ -1103,6 +1133,9 @@ bool PluginManager::export_enabled(const std::string& id) {
         }
         if (id == "websocket") {
             return impl_->websocket_enabled_;
+        }
+        if (id == "mqtt") {
+            return impl_->mqtt_enabled_;
         }
         return false;
     });

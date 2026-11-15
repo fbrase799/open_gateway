@@ -44,6 +44,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         websockify \
         x11-utils \
         x11vnc \
+        xauth \
+        xserver-xephyr \
         xvfb \
     && rm -rf /var/lib/apt/lists/*
 
@@ -52,5 +54,6 @@ COPY docker/display-entrypoint.sh /usr/local/bin/ogw-display-entrypoint
 RUN chmod +x /usr/local/bin/ogw-display-entrypoint
 
 ENV OGW_API=http://gateway:8080
+ENV OGW_UI=novnc
 EXPOSE 6080
 ENTRYPOINT ["/usr/local/bin/ogw-display-entrypoint"]

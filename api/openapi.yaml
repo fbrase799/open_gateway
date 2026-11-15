@@ -1,0 +1,106 @@
+openapi: 3.1.0
+info:
+  title: Open Gateway
+  version: 0.1.0
+  description: |
+    REST and MQTT for the same device catalog. MQTT is a host export, not a plugin.
+paths:
+  /api/v1/health:
+    get:
+      summary: Process health
+      responses:
+        "200":
+          description: The process is up
+  /api/v1/support:
+    get:
+      summary: Advertised exports and sources
+      responses:
+        "200":
+          description: Support catalog
+  /api/v1/support/exports/{id}:
+    put:
+      summary: Enable or disable an advertised export
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string, enum: [rest, websocket, mqtt]}
+      responses:
+        "200":
+          description: Updated catalog
+        "404":
+          description: Export is not advertised
+  /api/v1/support/sources/{id}:
+    put:
+      summary: Enable or disable an installed source
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: {type: string}
+      responses:
+        "200":
+          description: Updated catalog
+        "400":
+          description: Setting rejected or upload rejected
+  /api/v1/devices:
+    get:
+      summary: Current devices and readings
+      responses:
+        "200":
+          description: Device list
+  /api/v1/devices/{deviceId}/commands/{capabilityId}:
+    post:
+      summary: Invoke a command capability
+      parameters:
+        - name: deviceId
+          in: path
+          required: true
+          schema: {type: string}
+        - name: capabilityId
+          in: path
+          required: true
+          schema: {type: string}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value: {type: number}
+      responses:
+        "200":
+          description: Command accepted
+        "400":
+          description: Capability is not a command
+        "404":
+          description: Unknown device or capability
+  /api/v1/telemetry/current:
+    get:
+      summary: Current readings
+      responses:
+        "200":
+          description: Readings
+  /api/v1/stream:
+    get:
+      summary: WebSocket of live device events
+      responses:
+        "101":
+          description: Switching protocols
+x-ogw-mqtt:
+  broker: mqtt://host:1883
+  topics:
+    - topic: ogw/v1/devices/{deviceId}
+      direction: gateway-to-consumer
+      retained: true
+      description: Device identity and status
+    - topic: ogw/v1/devices/{deviceId}/capabilities/{capabilityId}
+      direction: gateway-to-consumer
+      retained: false
+      description: Measurement readings
+    - topic: ogw/v1/devices/{deviceId}/commands/{capabilityId}
+      direction: consumer-to-gateway
+      retained: false
+      description: Command payload with a numeric value

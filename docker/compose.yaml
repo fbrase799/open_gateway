@@ -10,6 +10,13 @@ services:
       - ..:/src:ro
     command: ["bash", "/src/docker/run-unit-tests.sh"]
 
+  mosquitto:
+    image: eclipse-mosquitto:2
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+    ports:
+      - "1883:1883"
+
   gateway:
     build:
       context: ..
@@ -18,26 +25,28 @@ services:
         OGW_WITH_CAN: "1"
     environment:
       OGW_PROFILE: local
+      OGW_MQTT_URL: mqtt://mosquitto:1883
+      OGW_HOST_NETNS: /host/netns
+      OGW_CAN_IFACE: can0
+      OGW_CAN_BITRATE: "500000"
+    cap_add:
+      - NET_ADMIN
+      - SYS_ADMIN
     ports:
+      - "127.0.0.1:8090:8080"
       - "127.0.0.1:8081:8081"
     volumes:
       - plugindir:/var/lib/ogw/plugins
+      - /proc/1/ns/net:/host/netns
+    depends_on:
+      mosquitto:
+        condition: service_started
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8080/api/v1/health"]
       interval: 2s
       timeout: 3s
       retries: 30
       start_period: 5s
-
-  web:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.web
-    ports:
-      - "8080:80"
-    depends_on:
-      gateway:
-        condition: service_healthy
 
   display:
     build:
@@ -47,6 +56,17 @@ services:
       - "6080:6080"
     environment:
       OGW_API: http://gateway:8080
+      OGW_UI: ${OGW_UI:-desktop}
+      # Local socket (:0 on WSLg). The XQuartz TCP display is used only when
+      # /tmp/.docker.xauth is a real cookie file.
+      DISPLAY: ${OGW_DISPLAY:-:0}
+      OGW_X11_TCP_DISPLAY: ${OGW_X11_TCP_DISPLAY:-host.docker.internal:0}
+      XAUTHORITY: /tmp/.docker.xauth
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+      - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
     depends_on:
       gateway:
         condition: service_healthy

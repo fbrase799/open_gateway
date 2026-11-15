@@ -93,6 +93,7 @@ public:
     virtual void start() = 0;
     virtual void stop() = 0;
     virtual std::string settings_schema() const { return "[]"; }
+    virtual void command(std::string_view /*capability_id*/, std::string_view /*json*/) {}
 
     void bind(const ogw_host_api* api) { host_ = HostServices(api); }
 
@@ -224,9 +225,25 @@ int32_t describe_settings(ogw_plugin* plugin, char* buf, std::size_t len) {
 }
 
 template <typename T>
+int32_t invoke_command(ogw_plugin* plugin, const char* capability_id, const char* json, char* err, std::size_t err_len) {
+    auto* wrapper = reinterpret_cast<Wrapper<T>*>(plugin);
+    try {
+        wrapper->impl->command(capability_id == nullptr ? std::string_view{} : std::string_view{capability_id},
+                               json == nullptr ? std::string_view{} : std::string_view{json});
+        return OGW_OK;
+    } catch (const std::exception& ex) {
+        copy_error(err, err_len, ex.what());
+        return OGW_ERR_REJECTED;
+    } catch (...) {
+        copy_error(err, err_len, "unknown plugin error");
+        return OGW_ERR_REJECTED;
+    }
+}
+
+template <typename T>
 const ogw_plugin_vtable* vtable() {
     static const ogw_plugin_vtable table{sizeof(ogw_plugin_vtable), &get_info<T>, &init_plugin<T>, &start_plugin<T>,
-                                         &stop_plugin<T>, &describe_settings<T>};
+                                         &stop_plugin<T>,          &describe_settings<T>, &invoke_command<T>};
     return &table;
 }
 

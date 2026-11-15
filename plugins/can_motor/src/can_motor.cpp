@@ -20,7 +20,7 @@ CanFrameMap showcase_frame() {
     CanFrameMap frame;
     frame.id = 0x101;
     frame.deviceLocalId = "showcase";
-    frame.displayName = "Bare-metal showcase";
+    frame.displayName = "Motor Control";
     frame.signals.push_back({"encoder_counts", "number", "counts", 0, 4, 1, true});
     frame.signals.push_back({"duty", "number", "%", 4, 1, 1, false});
     frame.signals.push_back({"direction", "number", "", 5, 1, 1, false});
@@ -29,7 +29,36 @@ CanFrameMap showcase_frame() {
 
 class CanMotorPlugin final : public ogw::sdk::Plugin {
 public:
-    ogw::sdk::Info info() const override { return {"can-motor", "CAN motor", "0.1.0"}; }
+    ogw::sdk::Info info() const override { return {"can-motor", "Motor Control", "0.1.0"}; }
+
+    void command(std::string_view capability, std::string_view payload) override {
+        if (capability != "set_duty" || socket_ < 0) {
+            throw std::runtime_error("command is not available");
+        }
+        int duty = 0;
+        const auto marker = payload.find("\"value\"");
+        if (marker != std::string_view::npos) {
+            auto pos = marker + 7;
+            while (pos < payload.size() && (payload[pos] == ' ' || payload[pos] == ':' || payload[pos] == '"')) {
+                ++pos;
+            }
+            while (pos < payload.size() && payload[pos] >= '0' && payload[pos] <= '9') {
+                duty = duty * 10 + (payload[pos] - '0');
+                if (duty > 100) {
+                    duty = 100;
+                    break;
+                }
+                ++pos;
+            }
+        }
+        can_frame frame{};
+        frame.can_id = 0x100;
+        frame.can_dlc = 1;
+        frame.data[0] = static_cast<unsigned char>(duty);
+        if (::write(socket_, &frame, sizeof(frame)) < 0) {
+            throw std::runtime_error("CAN command was not sent");
+        }
+    }
 
     void init(std::string_view config) override {
         const auto marker = config.find("\"interface\"");
@@ -76,6 +105,8 @@ public:
                                    R"(},{"id":"duty","kind":"measurement","valueType":"number","displayName":"Duty","unit":"%","presentation":"gauge","range":{"min":0,"max":100},"staleAfterMs":)" +
                                    std::to_string(stale_after_ms_) +
                                    R"(},{"id":"direction","kind":"measurement","valueType":"string","displayName":"Direction","presentation":"text","staleAfterMs":)" +
+                                   std::to_string(stale_after_ms_) +
+                                   R"(},{"id":"set_duty","kind":"command","valueType":"number","displayName":"Duty","range":{"min":0,"max":100},"staleAfterMs":)" +
                                    std::to_string(stale_after_ms_) + "}]}";
         host().register_device(device);
         running_.store(true);

@@ -5,6 +5,7 @@ services:
   gateway:
     environment:
       OGW_PROFILE: test
+      OGW_MQTT_URL: mqtt://mosquitto:1883
 
   live-tests:
     build:
@@ -17,6 +18,8 @@ services:
       OGW_PLUGIN_VOLUME: /plugins
       OGW_MOTOR_SO: /opt/ogw/examples/libmotor_sim.so
       OGW_BAD_SO: /opt/ogw/examples/libbad_plugin.so
+      OGW_MQTT: mqtt://mosquitto:1883
+      OGW_OPENAPI: /opt/ogw/openapi.yaml
     volumes:
       - plugindir:/plugins
     depends_on:

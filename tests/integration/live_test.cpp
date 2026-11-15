@@ -9,15 +9,24 @@
 
 #include <atomic>
 #include <chrono>
+#include <cstdint>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <functional>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <string>
 #include <string_view>
 #include <thread>
 #include <vector>
+
+#include <arpa/inet.h>
+#include <netdb.h>
+#include <poll.h>
+#include <sys/socket.h>
+#include <unistd.h>
 
 namespace beast = boost::beast;
 namespace http = beast::http;
@@ -150,6 +159,104 @@ private:
     std::thread thread_;
 };
 
+void append_u16(std::string& out, std::uint16_t value) {
+    out.push_back(static_cast<char>((value >> 8) & 0xff));
+    out.push_back(static_cast<char>(value & 0xff));
+}
+
+void append_mqtt_string(std::string& out, std::string_view value) {
+    append_u16(out, static_cast<std::uint16_t>(value.size()));
+    out.append(value);
+}
+
+std::string mqtt_packet(unsigned char header, const std::string& body) {
+    std::string out;
+    out.push_back(static_cast<char>(header));
+    auto length = body.size();
+    do {
+        auto byte = static_cast<unsigned char>(length % 128);
+        length /= 128;
+        if (length > 0) {
+            byte = static_cast<unsigned char>(byte | 0x80);
+        }
+        out.push_back(static_cast<char>(byte));
+    } while (length > 0);
+    out.append(body);
+    return out;
+}
+
+bool mqtt_sees(const char* url, const std::string& needle, std::chrono::milliseconds budget) {
+    if (url == nullptr || url[0] == '\0') {
+        return false;
+    }
+    std::string text = url;
+    constexpr std::string_view prefix = "mqtt://";
+    if (text.rfind(prefix, 0) == 0) {
+        text = text.substr(prefix.size());
+    }
+    const auto colon = text.rfind(':');
+    const std::string host = colon == std::string::npos ? text : text.substr(0, colon);
+    std::string port = colon == std::string::npos ? "1883" : text.substr(colon + 1);
+    const auto slash = port.find('/');
+    if (slash != std::string::npos) {
+        port = port.substr(0, slash);
+    }
+    addrinfo hints{};
+    hints.ai_socktype = SOCK_STREAM;
+    addrinfo* result = nullptr;
+    if (getaddrinfo(host.c_str(), port.c_str(), &hints, &result) != 0) {
+        return false;
+    }
+    const int fd = ::socket(result->ai_family, result->ai_socktype, result->ai_protocol);
+    if (fd < 0) {
+        freeaddrinfo(result);
+        return false;
+    }
+    const bool connected = ::connect(fd, result->ai_addr, result->ai_addrlen) == 0;
+    freeaddrinfo(result);
+    if (!connected) {
+        ::close(fd);
+        return false;
+    }
+    std::string connect_body;
+    append_mqtt_string(connect_body, "MQTT");
+    connect_body.push_back(4);
+    connect_body.push_back(0x02);
+    append_u16(connect_body, 30);
+    append_mqtt_string(connect_body, "ogw-live");
+    std::string subscribe;
+    append_u16(subscribe, 1);
+    append_mqtt_string(subscribe, "ogw/v1/devices/#");
+    subscribe.push_back(0);
+    const auto hello = mqtt_packet(0x10, connect_body) + mqtt_packet(0x82, subscribe);
+    if (::send(fd, hello.data(), hello.size(), MSG_NOSIGNAL) != static_cast<ssize_t>(hello.size())) {
+        ::close(fd);
+        return false;
+    }
+    std::string received;
+    const auto deadline = std::chrono::steady_clock::now() + budget;
+    while (std::chrono::steady_clock::now() < deadline) {
+        if (received.find(needle) != std::string::npos) {
+            ::close(fd);
+            return true;
+        }
+        pollfd watch{};
+        watch.fd = fd;
+        watch.events = POLLIN;
+        if (::poll(&watch, 1, 200) <= 0) {
+            continue;
+        }
+        char buffer[1024];
+        const auto count = ::recv(fd, buffer, sizeof(buffer), 0);
+        if (count <= 0) {
+            break;
+        }
+        received.append(buffer, buffer + count);
+    }
+    ::close(fd);
+    return received.find(needle) != std::string::npos;
+}
+
 }  // namespace
 
 TEST_CASE("runtime plugin activation and faults", "[live]") {
@@ -169,20 +276,22 @@ TEST_CASE("runtime plugin activation and faults", "[live]") {
         }
     }));
 
-    REQUIRE(wait_until(std::chrono::seconds(10), [&] {
-        auto body = request(http, http::verb::get, "/api/v1/devices").body;
-        return body.find("temperature-sim/room-1") != std::string::npos;
-    }));
-
     auto support = nlohmann::json::parse(request(http, http::verb::get, "/api/v1/support").body);
     const auto support_text = support.dump();
     REQUIRE(support_text.find("\"rest\"") != std::string::npos);
     REQUIRE(support_text.find("\"websocket\"") != std::string::npos);
+    REQUIRE(support_text.find("\"mqtt\"") != std::string::npos);
     REQUIRE(support_text.find("temperature-sim") != std::string::npos);
-    REQUIRE(support_text.find("\"mqtt\"") == std::string::npos);
-    REQUIRE(request(http, http::verb::put, "/api/v1/support/exports/mqtt", R"({"enabled":true})").status == 404);
+    REQUIRE(request(http, http::verb::put, "/api/v1/support/exports/mqtt", R"({"enabled":true})").status == 200);
     REQUIRE(request(http, http::verb::put, "/api/v1/support/sources/temperature-sim", R"({"state":"active","path":"/tmp/x"})").status ==
             400);
+    REQUIRE(request(http, http::verb::put, "/api/v1/support/sources/temperature-sim", R"({"state":"active","settings":{}})").status ==
+            200);
+
+    REQUIRE(wait_until(std::chrono::seconds(10), [&] {
+        auto body = request(http, http::verb::get, "/api/v1/devices").body;
+        return body.find("temperature-sim/room-1") != std::string::npos;
+    }));
     REQUIRE(request(http, http::verb::put, "/api/v1/support/exports/websocket", R"({"enabled":false})").status == 200);
     REQUIRE(request(http, http::verb::get, "/api/v1/support").body.find("\"enabled\":false") != std::string::npos);
     REQUIRE(request(http, http::verb::get, "/api/v1/health").status == 200);
@@ -195,6 +304,17 @@ TEST_CASE("runtime plugin activation and faults", "[live]") {
     REQUIRE_FALSE(current["readings"].empty());
     REQUIRE(current["readings"][0].contains("quality"));
     REQUIRE(current["readings"][0].contains("sourceTimestamp"));
+    REQUIRE(request(http, http::verb::post, "/api/v1/devices/temperature-sim/room-1/commands/temperature", R"({"value":1})").status ==
+            400);
+    if (const char* spec_path = std::getenv("OGW_OPENAPI")) {
+        std::ifstream spec(spec_path);
+        std::string text((std::istreambuf_iterator<char>(spec)), std::istreambuf_iterator<char>());
+        REQUIRE(text.find("/api/v1/devices") != std::string::npos);
+        REQUIRE(text.find("x-ogw-mqtt") != std::string::npos);
+    }
+    if (const char* mqtt = std::getenv("OGW_MQTT")) {
+        REQUIRE(mqtt_sees(mqtt, "temperature-sim/room-1", std::chrono::seconds(15)));
+    }
 
     SocketLog stream(http);
     REQUIRE(wait_until(std::chrono::seconds(5), [&] { return stream.contains("temperature-sim/room-1"); }));

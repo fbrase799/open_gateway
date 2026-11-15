@@ -16,13 +16,27 @@
     {
       "id": "temperature-sim",
       "file": "libtemperature_sim.so",
-      "activate": true,
+      "activate": false,
       "config": {
         "intervalMs": 1000,
         "seed": 1,
         "timeline": [
           {"forMs": 20000, "mode": "normal"},
           {"forMs": 10000, "mode": "out_of_range"},
+          {"forMs": 10000, "mode": "disconnected"}
+        ]
+      }
+    },
+    {
+      "id": "motor-sim",
+      "file": "libmotor_sim.so",
+      "activate": false,
+      "config": {
+        "intervalMs": 1000,
+        "seed": 2,
+        "timeline": [
+          {"forMs": 20000, "mode": "running"},
+          {"forMs": 10000, "mode": "fault"},
           {"forMs": 10000, "mode": "disconnected"}
         ]
       }

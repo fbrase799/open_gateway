@@ -21,8 +21,6 @@ struct SourceRequest {
 
 inline bool probe_source(const SourceRequest& source) { return source.requested && !source.simulated; }
 
-inline bool use_simulated_source(const SourceRequest& source, bool real_sensor_active) {
-    return source.requested && source.simulated && !real_sensor_active;
-}
+inline bool use_simulated_source(const SourceRequest&, bool) { return false; }
 
 }  // namespace ogw

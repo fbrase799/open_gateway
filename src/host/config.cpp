@@ -68,6 +68,9 @@ void apply_json(Config& config, const nlohmann::json& document) {
     if (document.contains("corsOrigin")) {
         config.corsOrigin = document.at("corsOrigin").get<std::string>();
     }
+    if (document.contains("mqttUrl") && document.at("mqttUrl").is_string()) {
+        config.mqttUrl = document.at("mqttUrl").get<std::string>();
+    }
     if (document.contains("plugins")) {
         config.plugins.clear();
         for (const auto& item : document.at("plugins")) {
@@ -132,6 +135,9 @@ Config load_config() {
     }
     if (const char* value = env_or_null("OGW_CORS_ORIGIN")) {
         config.corsOrigin = value;
+    }
+    if (const char* value = env_or_null("OGW_MQTT_URL")) {
+        config.mqttUrl = value;
     }
     if (config.httpPort == config.adminPort && config.adminApi) {
         throw std::runtime_error("httpPort and adminPort must be different");

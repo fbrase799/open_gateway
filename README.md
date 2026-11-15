@@ -1,6 +1,8 @@
 # Open Gateway
 
-Open Gateway is a headless C++23 gateway that loads trusted plugins at runtime. `sample_client` is the React dashboard. The same API is shown by a Qt screen: in Docker through noVNC, and on a Raspberry Pi by a separate Yocto product that includes this source and uses that image’s Qt. The core does not know whether a reading came from a simulator or CAN. A real sensor is shown when one is connected. The temperature simulator runs when none is.
+Open Gateway is a headless C++23 gateway that loads trusted plugins at runtime. The only UI is the Qt screen in `edge/display`, laid out for the Raspberry Pi Touch Display 2 at 1280×720. Local Compose opens that window on the developer machine. `OGW_UI=novnc` shows the same window in a browser. Azure uses noVNC. Consumers read the same data over REST and MQTT, both described in `api/openapi.yaml`.
+
+Simulated sensors stay off until a person enables them. A real sensor that is not plugged in is listed and greyed out. The dashboard shows only enabled devices.
 
 ## Run the demo
 
@@ -10,17 +12,24 @@ Docker is the only setup requirement.
 docker compose -f docker/compose.yaml up --build
 ```
 
-Open http://127.0.0.1:8080. With no real sensor connected, the room sensor is publishing. The Qt screen is at http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale. The support panel lists REST, the live channel, and the installed sources. In another terminal, install the motor plugin without restarting the gateway:
+The API is at http://127.0.0.1:8090. With no hardware connected, the sensor list shows Motor Control greyed out and the simulators disabled. Enable Temperature in the list and the room sensor appears on the dashboard.
+
+Desktop mode (`OGW_UI=desktop`, the Compose default) opens a 1280×720 window on the developer machine. On WSL the container uses the WSLg socket at `/tmp/.X11-unix`, so Compose can start directly. On a Mac the container reaches XQuartz over TCP and presents an MIT-MAGIC-COOKIE. Start XQuartz, then refresh the cookie before Compose:
 
 ```bash
-./scripts/demo-activate-motor.sh
+./docker/xquartz-xauth.sh
+docker compose -f docker/compose.yaml up --build
 ```
 
-The script copies the library and scans. Enable Motor in the support panel. The open dashboard adds the motor card. Disable it from the same panel.
+The script turns on XQuartz TCP (`nolisten_tcp` false) and leaves `no_auth` false, so a client without the cookie is rejected. Restart XQuartz once after that preference change. The container does not install an X server on the Mac. If that display is not available, start the browser session instead:
 
-Admin scan is bound for local use on `127.0.0.1:8081`. The cloud profile and the separate Pi product leave that listener off. How the Pi image includes this source is in [docs/pi.md](docs/pi.md).
+```bash
+OGW_UI=novnc docker compose -f docker/compose.yaml up --build
+```
 
-Simulators walk a timeline of normal readings, a fault, and a disconnect. Stale or bad quality stays visible as a status; the last number is not presented as live.
+Open http://127.0.0.1:6080/vnc.html?autoconnect=1&resize=scale.
+
+Admin scan stays on `127.0.0.1:8081`. The cloud profile and the separate Pi product leave that listener off. The later embedded-Linux project includes this source and starts the same Qt window fullscreen on the panel. See [docs/pi.md](docs/pi.md).
 
 ## Tests
 
@@ -35,12 +44,13 @@ docker compose -f docker/compose.yaml -f docker/compose.test.yaml up --build --a
 | --- | --- |
 | `include/ogw`, `src/core` | Device model, registry, telemetry. No sockets and no `dlopen`. |
 | `src/host` | Plugin loader, lifecycle, configuration. |
+| `src/api` | REST, WebSocket, and the MQTT publisher. |
 | `sdk/` | C ABI and the C++ helpers plugin authors include. |
-| `plugins/temperature_sim` | Simulator shipped with the gateway. |
-| `plugins/motor_sim` | Standalone CMake project. It links only the SDK. |
-| `sample_client` | React sample dashboard. |
-| `edge/display` | Qt/QML sources. Docker shows them through noVNC. The separate Yocto product builds them for the panel. |
-| `plugins/can_motor` | SocketCAN plugin for the bare-metal controller. Probed before the simulator. |
-| `docker/` | Toolchain, gateway, web, and Compose files. |
+| `plugins/temperature_sim` | Temperature simulator. Disabled until enabled. |
+| `plugins/motor_sim` | Motor Control simulator. Disabled until enabled. |
+| `plugins/can_motor` | SocketCAN Motor Control for the bare-metal controller. |
+| `edge/display` | Qt/QML sensor list and dashboard at 1280×720. |
+| `api/openapi.yaml` | REST paths and MQTT topics. |
+| `docker/` | Toolchain, gateway, display, broker, and Compose files. |
 
 See [docs/architecture.md](docs/architecture.md) and [docs/add-a-plugin.md](docs/add-a-plugin.md). Cloud deployment is described in [docs/azure.md](docs/azure.md). The product requirements are in [PRD.md](PRD.md) and the build sequence is in [PLAN.md](PLAN.md).

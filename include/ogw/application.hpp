@@ -2,6 +2,7 @@
 
 #include "ogw/config.hpp"
 #include "ogw/http_server.hpp"
+#include "ogw/mqtt_client.hpp"
 #include "ogw/pipeline.hpp"
 #include "ogw/plugin_manager.hpp"
 #include "ogw/registry.hpp"
@@ -20,6 +21,7 @@ private:
     TelemetryPipeline pipeline_;
     PluginManager plugins_;
     WsHub hub_;
+    MqttClient mqtt_;
 };
 
 }  // namespace ogw

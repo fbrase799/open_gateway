@@ -70,6 +70,7 @@ typedef struct ogw_plugin_vtable {
     int32_t (*start)(ogw_plugin* plugin, char* err, size_t err_len);
     int32_t (*stop)(ogw_plugin* plugin, char* err, size_t err_len);
     int32_t (*describe_settings)(ogw_plugin* plugin, char* buf, size_t len);
+    int32_t (*invoke)(ogw_plugin* plugin, const char* capability_id, const char* json, char* err, size_t err_len);
 } ogw_plugin_vtable;
 
 struct ogw_plugin {

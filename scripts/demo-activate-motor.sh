@@ -11,4 +11,4 @@ docker compose -f docker/compose.yaml exec -T gateway \
     cp /opt/ogw/examples/libmotor_sim.so /var/lib/ogw/plugins/libmotor_sim.so
 curl -fsS -X POST "http://127.0.0.1:8081/api/v1/admin/plugins/scan"
 echo
-echo "motor-sim is installed and inactive. Enable it from the sample client support panel."
+echo "motor-sim is installed and inactive. Enable it in the sensor list."

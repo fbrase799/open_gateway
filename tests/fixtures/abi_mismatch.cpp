@@ -16,7 +16,7 @@ int32_t abi_get_info(ogw_plugin*, ogw_plugin_info* info) {
 
 int32_t abi_noop(ogw_plugin*, char*, size_t) { return OGW_ERR_ABI; }
 
-ogw_plugin_vtable abi_vtable{sizeof(ogw_plugin_vtable), abi_get_info, abi_noop, abi_noop, abi_noop, nullptr};
+ogw_plugin_vtable abi_vtable{sizeof(ogw_plugin_vtable), abi_get_info, abi_noop, abi_noop, abi_noop, nullptr, nullptr};
 
 }  // namespace
 
