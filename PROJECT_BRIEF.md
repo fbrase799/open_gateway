@@ -27,3 +27,8 @@ open_gateway
 9. There shall be an option e.g. environment variable in compose.yml to decide whether to use a Desktop application or noVNC
 10. A trusted .so can be installed and activated while the gateway is running
 11. Techniques to provide data to consumers shall include MQTT and REST, so they should appear in the OpenAPI spec
+12. A configuration toml file shall be used - if the file does not exist it shall be created with useful default values
+
+*Known Limitations*
+
+1. Docker Desktop in MacOS it will provides a linux kernel with no support for CAN - hence CAN will never work as a real target
