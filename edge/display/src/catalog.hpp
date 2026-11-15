@@ -1,5 +1,7 @@
 #pragma once
 
+#include "display_config.hpp"
+
 #include <QString>
 #include <QVector>
 
@@ -25,4 +27,6 @@ struct CatalogView {
     QVector<DashboardCard> dashboard;
 };
 
-CatalogView catalog_from_json(const QByteArray& devices_body, const QByteArray& support_body);
+// settings supplies the names and the enabled flags from display.toml.
+CatalogView catalog_from_json(const QByteArray& devices_body, const QByteArray& support_body,
+                              const DisplaySettings& settings = {});

@@ -55,5 +55,6 @@ RUN chmod +x /usr/local/bin/ogw-display-entrypoint
 
 ENV OGW_API=http://gateway:8080
 ENV OGW_UI=novnc
+ENV OGW_DISPLAY_CONFIG=/etc/ogw/display.toml
 EXPOSE 6080
 ENTRYPOINT ["/usr/local/bin/ogw-display-entrypoint"]

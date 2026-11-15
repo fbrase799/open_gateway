@@ -57,16 +57,18 @@ services:
     environment:
       OGW_API: http://gateway:8080
       OGW_UI: ${OGW_UI:-desktop}
-      # Local socket (:0 on WSLg). The XQuartz TCP display is used only when
-      # /tmp/.docker.xauth is a real cookie file.
+      # :0 is the WSLg socket. The entrypoint uses it when xdpyinfo answers.
+      # Otherwise it uses the XQuartz TCP display and the cookie file.
       DISPLAY: ${OGW_DISPLAY:-:0}
       OGW_X11_TCP_DISPLAY: ${OGW_X11_TCP_DISPLAY:-host.docker.internal:0}
       XAUTHORITY: /tmp/.docker.xauth
+      OGW_DISPLAY_CONFIG: /etc/ogw/config/display.toml
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - /tmp/.X11-unix:/tmp/.X11-unix
       - /tmp/.docker.xauth:/tmp/.docker.xauth:ro
+      - ../config:/etc/ogw/config
     depends_on:
       gateway:
         condition: service_healthy

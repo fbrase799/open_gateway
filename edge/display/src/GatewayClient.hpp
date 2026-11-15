@@ -16,7 +16,7 @@ class GatewayClient : public QObject {
     Q_PROPERTY(QString link READ link NOTIFY changed)
 
 public:
-    explicit GatewayClient(QString baseUrl, QObject* parent = nullptr);
+    explicit GatewayClient(QString baseUrl, DisplaySettings settings = {}, QObject* parent = nullptr);
     QVariantList sensors() const { return sensors_; }
     QVariantList dashboard() const { return dashboard_; }
     QString link() const { return link_; }
@@ -35,6 +35,7 @@ private:
     QTimer timer_;
     QByteArray devicesBody_;
     QByteArray supportBody_;
+    DisplaySettings settings_;
     QVariantList sensors_;
     QVariantList dashboard_;
     QString link_ = QStringLiteral("connecting");

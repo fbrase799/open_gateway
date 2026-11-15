@@ -14,7 +14,7 @@ docker compose -f docker/compose.yaml up --build
 
 The API is at http://127.0.0.1:8090. With no hardware connected, the sensor list shows Motor Control greyed out and the simulators disabled. Enable Temperature in the list and the room sensor appears on the dashboard.
 
-Desktop mode (`OGW_UI=desktop`, the Compose default) opens a 1280×720 window on the developer machine. On WSL the container uses the WSLg socket at `/tmp/.X11-unix`, so Compose can start directly. On a Mac the container reaches XQuartz over TCP and presents an MIT-MAGIC-COOKIE. Start XQuartz, then refresh the cookie before Compose:
+Desktop mode (`OGW_UI=desktop`, the Compose default) opens a 1280×720 window on the developer machine. The container uses `/tmp/.X11-unix` when that socket answers, which is the WSLg case, so Compose can start directly. When the socket does not answer, it reaches XQuartz over TCP and presents an MIT-MAGIC-COOKIE. On a Mac, start XQuartz, then refresh the cookie before Compose:
 
 ```bash
 ./docker/xquartz-xauth.sh

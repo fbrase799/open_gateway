@@ -7,7 +7,8 @@
 #include <QNetworkRequest>
 #include <QUrl>
 
-GatewayClient::GatewayClient(QString baseUrl, QObject* parent) : QObject(parent), baseUrl_(std::move(baseUrl)) {
+GatewayClient::GatewayClient(QString baseUrl, DisplaySettings settings, QObject* parent)
+    : QObject(parent), baseUrl_(std::move(baseUrl)), settings_(std::move(settings)) {
     network_ = new QNetworkAccessManager(this);
     connect(&timer_, &QTimer::timeout, this, &GatewayClient::refresh);
     timer_.start(1000);
@@ -39,7 +40,7 @@ void GatewayClient::refresh() {
 }
 
 void GatewayClient::rebuild() {
-    const auto view = catalog_from_json(devicesBody_, supportBody_);
+    const auto view = catalog_from_json(devicesBody_, supportBody_, settings_);
     sensors_.clear();
     for (const auto& row : view.sensors) {
         sensors_.push_back(QVariantMap{{QStringLiteral("id"), row.id},

@@ -10,3 +10,4 @@ web/dashboard/dist/
 *.user
 .idea/
 .vscode/
+config/display.toml

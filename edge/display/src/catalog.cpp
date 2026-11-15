@@ -28,9 +28,35 @@ bool simulated_source(const QJsonObject& source) {
     return source.value(QStringLiteral("id")).toString().endsWith(QStringLiteral("-sim"));
 }
 
+QString simulator_list_name(QString name) {
+    if (name.contains(QLatin1Char('\n'))) {
+        return name;
+    }
+    const auto suffix = QStringLiteral(" Simulator");
+    if (name.endsWith(suffix)) {
+        name.chop(suffix.size());
+    }
+    return name + QLatin1Char('\n') + QStringLiteral("Simulator");
+}
+
+const DeviceEntry* configured_entry(const DisplaySettings& settings, bool simulated, const QString& id) {
+    const auto& table = simulated ? settings.simulators : settings.devices;
+    const auto found = table.constFind(id);
+    if (found == table.cend()) {
+        return nullptr;
+    }
+    return &found.value();
+}
+
+QString first_line(const QString& name) {
+    const auto split = name.indexOf(QLatin1Char('\n'));
+    return split < 0 ? name : name.left(split);
+}
+
 }  // namespace
 
-CatalogView catalog_from_json(const QByteArray& devices_body, const QByteArray& support_body) {
+CatalogView catalog_from_json(const QByteArray& devices_body, const QByteArray& support_body,
+                              const DisplaySettings& settings) {
     const auto device_items = QJsonDocument::fromJson(devices_body).object().value(QStringLiteral("devices")).toArray();
     const auto source_items = QJsonDocument::fromJson(support_body).object().value(QStringLiteral("sources")).toArray();
     CatalogView view;
@@ -41,9 +67,19 @@ CatalogView catalog_from_json(const QByteArray& devices_body, const QByteArray& 
         if (row.id.isEmpty()) {
             continue;
         }
+        const bool simulated = simulated_source(source);
+        const auto* entry = configured_entry(settings, simulated, row.id);
+        if (entry != nullptr && !entry->enabled) {
+            continue;
+        }
         row.name = source.value(QStringLiteral("name")).toString(row.id);
         row.detail = source.value(QStringLiteral("error")).toString();
-        const bool simulated = simulated_source(source);
+        if (entry != nullptr && !entry->name.isEmpty()) {
+            row.name = entry->name;
+        }
+        if (simulated) {
+            row.name = simulator_list_name(row.name);
+        }
         const bool active = source.value(QStringLiteral("state")).toString() == QStringLiteral("active");
         bool real_live = false;
         QVector<QJsonObject> owned;
@@ -80,6 +116,9 @@ CatalogView catalog_from_json(const QByteArray& devices_body, const QByteArray& 
                 continue;
             }
             card.name = device.value(QStringLiteral("displayName")).toString(card.id);
+            if (entry != nullptr && !entry->name.isEmpty()) {
+                card.name = first_line(entry->name);
+            }
             card.status = device.value(QStringLiteral("status")).toString();
             QStringList parts;
             for (const auto& capability_value : device.value(QStringLiteral("capabilities")).toArray()) {
